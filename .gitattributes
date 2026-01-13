@@ -1,0 +1,12 @@
+# Ensure consistent line endings
+* text=auto
+
+# Python files
+*.py text eol=lf
+
+# HTML files
+*.html text eol=lf
+
+# Text files
+*.txt text eol=lf
+*.md text eol=lf

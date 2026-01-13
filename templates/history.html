@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alert History - Wildfire Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 20px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            color: #ff6b6b;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        
+        .subtitle {
+            color: #b0b0b0;
+            font-size: 1.1rem;
+        }
+        
+        .nav-links {
+            margin-top: 20px;
+        }
+        
+        .nav-links a {
+            color: #4ecdc4;
+            text-decoration: none;
+            margin: 0 15px;
+            font-size: 1.1rem;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #ff6b6b;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .stat-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px 25px;
+            border-radius: 10px;
+            border-left: 4px solid #4ecdc4;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #4ecdc4;
+        }
+        
+        .stat-label {
+            font-size: 0.9rem;
+            color: #b0b0b0;
+            margin-top: 5px;
+        }
+        
+        .alerts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 25px;
+            margin-top: 30px;
+        }
+        
+        .alert-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            cursor: pointer;
+        }
+        
+        .alert-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+        }
+        
+        .alert-thumbnail {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .alert-details {
+            padding: 20px;
+        }
+        
+        .alert-label {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .label-fire {
+            color: #ff6b6b;
+        }
+        
+        .label-smoke {
+            color: #ffa502;
+        }
+        
+        .alert-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .confidence {
+            font-size: 0.9rem;
+            color: #4ecdc4;
+            font-weight: bold;
+        }
+        
+        .timestamp {
+            font-size: 0.85rem;
+            color: #b0b0b0;
+        }
+        
+        .no-alerts {
+            text-align: center;
+            padding: 60px 20px;
+            color: #b0b0b0;
+            font-size: 1.3rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            border: 2px dashed #4ecdc4;
+        }
+        
+        /* Modal for full-size image */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            overflow: auto;
+        }
+        
+        .modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            margin-top: 50px;
+            border-radius: 10px;
+        }
+        
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #fff;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .modal-close:hover {
+            color: #ff6b6b;
+        }
+        
+        .modal-info {
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2rem;
+        }
+        
+        @media (max-width: 768px) {
+            .alerts-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📜 Alert History</h1>
+            <p class="subtitle">Complete Detection Record</p>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/history">Alert History</a>
+            </div>
+        </header>
+        
+        {% if alerts %}
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-value">{{ alerts|length }}</div>
+                <div class="stat-label">Total Alerts</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ alerts|selectattr('label', 'equalto', 'fire')|list|length }}</div>
+                <div class="stat-label">Fire Detections</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value">{{ alerts|selectattr('label', 'equalto', 'smoke')|list|length }}</div>
+                <div class="stat-label">Smoke Detections</div>
+            </div>
+        </div>
+        
+        <div class="alerts-grid">
+            {% for alert in alerts %}
+            <div class="alert-item" onclick="openModal('{{ alert.image_path }}', '{{ alert.label }}', '{{ alert.confidence }}', '{{ alert.timestamp }}')">
+                <img src="/static/{{ alert.image_path }}" alt="Alert {{ alert.id }}" class="alert-thumbnail">
+                <div class="alert-details">
+                    <div class="alert-label label-{{ alert.label.lower() }}">
+                        {{ alert.label.upper() }}
+                    </div>
+                    <div class="alert-meta">
+                        <span class="confidence">{{ "%.1f"|format(alert.confidence * 100) }}%</span>
+                        <span class="timestamp">{{ alert.timestamp }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="no-alerts">
+            <p>No alerts in history yet</p>
+            <p style="font-size: 1rem; margin-top: 10px; color: #888;">
+                Detection alerts will appear here once they are recorded.
+            </p>
+        </div>
+        {% endif %}
+    </div>
+    
+    <!-- Modal for full-size image -->
+    <div id="imageModal" class="modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+        <div class="modal-info" id="modalInfo"></div>
+    </div>
+    
+    <script>
+        function openModal(imagePath, label, confidence, timestamp) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            const modalInfo = document.getElementById('modalInfo');
+            
+            modal.style.display = 'block';
+            modalImg.src = '/static/' + imagePath;
+            modalInfo.innerHTML = `
+                <strong style="color: ${label.toLowerCase() === 'fire' ? '#ff6b6b' : '#ffa502'};">
+                    ${label.toUpperCase()}
+                </strong> | 
+                Confidence: ${(parseFloat(confidence) * 100).toFixed(1)}% | 
+                Time: ${timestamp}
+            `;
+        }
+        
+        function closeModal() {
+            document.getElementById('imageModal').style.display = 'none';
+        }
+        
+        // Close modal when clicking outside the image
+        window.onclick = function(event) {
+            const modal = document.getElementById('imageModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+        
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

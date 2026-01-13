@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+
+# Database
+database.db
+*.db
+
+# Uploaded images (optional - remove if you want to track sample images)
+static/alerts/*.jpg
+static/alerts/*.jpeg
+static/alerts/*.png
+static/alerts/*.gif
+static/alerts/*.webp
+
+# Keep the alerts directory
+!static/alerts/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
