@@ -248,8 +248,8 @@
         
         <div class="alerts-grid">
             {% for alert in alerts %}
-            <div class="alert-item" onclick="openModal('{{ alert.image_path }}', '{{ alert.label }}', '{{ alert.confidence }}', '{{ alert.timestamp }}')">
-                <img src="/static/{{ alert.image_path }}" alt="Alert {{ alert.id }}" class="alert-thumbnail">
+            <div class="alert-item" onclick="openModal({{ alert.id }}, '{{ alert.label }}', '{{ alert.confidence }}', '{{ alert.timestamp }}')">
+                <img src="/image/{{ alert.id }}" alt="Alert {{ alert.id }}" class="alert-thumbnail">
                 <div class="alert-details">
                     <div class="alert-label label-{{ alert.label.lower() }}">
                         {{ alert.label.upper() }}
@@ -280,13 +280,13 @@
     </div>
     
     <script>
-        function openModal(imagePath, label, confidence, timestamp) {
+        function openModal(alertId, label, confidence, timestamp) {
             const modal = document.getElementById('imageModal');
             const modalImg = document.getElementById('modalImage');
             const modalInfo = document.getElementById('modalInfo');
             
             modal.style.display = 'block';
-            modalImg.src = '/static/' + imagePath;
+            modalImg.src = '/image/' + alertId;
             modalInfo.innerHTML = `
                 <strong style="color: ${label.toLowerCase() === 'fire' ? '#ff6b6b' : '#ffa502'};">
                     ${label.toUpperCase()}

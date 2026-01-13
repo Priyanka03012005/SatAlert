@@ -1,16 +1,25 @@
 import os
-import sqlite3
+import base64
 from datetime import datetime
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify
 from werkzeug.utils import secure_filename
 import uuid
 
+# Database imports - supports both PostgreSQL and SQLite
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    POSTGRES_AVAILABLE = True
+except ImportError:
+    import sqlite3
+    POSTGRES_AVAILABLE = False
+
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'static/alerts'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
-# Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+# Database configuration
+DATABASE_URL = os.environ.get('DATABASE_URL')  # Render PostgreSQL connection string
+USE_POSTGRES = POSTGRES_AVAILABLE and DATABASE_URL is not None
 
 # Allowed image extensions
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
@@ -19,49 +28,110 @@ def allowed_file(filename):
     """Check if file extension is allowed"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def init_db():
-    """Initialize SQLite database and create table if it doesn't exist"""
-    conn = sqlite3.connect('database.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS alerts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            image_path TEXT NOT NULL,
-            label TEXT NOT NULL,
-            confidence REAL NOT NULL,
-            timestamp TEXT NOT NULL
+def get_db_connection():
+    """Get database connection (PostgreSQL or SQLite)"""
+    if USE_POSTGRES:
+        # Parse DATABASE_URL for PostgreSQL
+        import urllib.parse as urlparse
+        result = urlparse.urlparse(DATABASE_URL)
+        conn = psycopg2.connect(
+            database=result.path[1:],
+            user=result.username,
+            password=result.password,
+            host=result.hostname,
+            port=result.port
         )
-    ''')
+        return conn
+    else:
+        # Fallback to SQLite
+        conn = sqlite3.connect('database.db')
+        conn.row_factory = sqlite3.Row
+        return conn
+
+def init_db():
+    """Initialize database and create table if it doesn't exist"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    if USE_POSTGRES:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS alerts (
+                id SERIAL PRIMARY KEY,
+                image_data TEXT NOT NULL,
+                image_filename TEXT NOT NULL,
+                label TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                timestamp TEXT NOT NULL
+            )
+        ''')
+    else:
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS alerts (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                image_data TEXT NOT NULL,
+                image_filename TEXT NOT NULL,
+                label TEXT NOT NULL,
+                confidence REAL NOT NULL,
+                timestamp TEXT NOT NULL
+            )
+        ''')
+    
     conn.commit()
     conn.close()
 
-def get_db_connection():
-    """Get database connection"""
-    conn = sqlite3.connect('database.db')
-    conn.row_factory = sqlite3.Row
-    return conn
+def get_alerts_from_db(query, params=None):
+    """Execute query and return results as list of dicts"""
+    conn = get_db_connection()
+    
+    if USE_POSTGRES:
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        results = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in results]
+    else:
+        cursor = conn.cursor()
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        results = cursor.fetchall()
+        conn.close()
+        alerts = []
+        for row in results:
+            alerts.append({
+                'id': row[0],
+                'image_data': row[1],
+                'image_filename': row[2],
+                'label': row[3],
+                'confidence': row[4],
+                'timestamp': row[5]
+            })
+        return alerts
 
 @app.route('/')
 def index():
     """Homepage - displays latest alert"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
+    query = '''
         SELECT * FROM alerts 
         ORDER BY timestamp DESC 
         LIMIT 1
-    ''')
-    latest_alert = cursor.fetchone()
-    conn.close()
+    '''
+    alerts = get_alerts_from_db(query)
     
     alert = None
-    if latest_alert:
+    if alerts:
+        alert_data = alerts[0]
         alert = {
-            'id': latest_alert['id'],
-            'image_path': latest_alert['image_path'],
-            'label': latest_alert['label'],
-            'confidence': latest_alert['confidence'],
-            'timestamp': latest_alert['timestamp']
+            'id': alert_data['id'],
+            'image_data': alert_data['image_data'],
+            'image_filename': alert_data['image_filename'],
+            'label': alert_data['label'],
+            'confidence': alert_data['confidence'],
+            'timestamp': alert_data['timestamp']
         }
     
     return render_template('index.html', alert=alert)
@@ -69,23 +139,21 @@ def index():
 @app.route('/history')
 def history():
     """History page - displays all alerts"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute('''
+    query = '''
         SELECT * FROM alerts 
         ORDER BY timestamp DESC
-    ''')
-    alerts = cursor.fetchall()
-    conn.close()
+    '''
+    alerts = get_alerts_from_db(query)
     
     alerts_list = []
-    for alert in alerts:
+    for alert_data in alerts:
         alerts_list.append({
-            'id': alert['id'],
-            'image_path': alert['image_path'],
-            'label': alert['label'],
-            'confidence': alert['confidence'],
-            'timestamp': alert['timestamp']
+            'id': alert_data['id'],
+            'image_data': alert_data['image_data'],
+            'image_filename': alert_data['image_filename'],
+            'label': alert_data['label'],
+            'confidence': alert_data['confidence'],
+            'timestamp': alert_data['timestamp']
         })
     
     return render_template('history.html', alerts=alerts_list)
@@ -123,34 +191,41 @@ def create_alert():
         if not (0.0 <= confidence <= 1.0):
             return jsonify({'error': 'Confidence must be between 0.0 and 1.0'}), 400
         
-        # Generate unique filename to prevent conflicts
+        # Read image file and convert to base64
+        file_content = file.read()
+        image_base64 = base64.b64encode(file_content).decode('utf-8')
+        
+        # Generate unique filename
         file_ext = file.filename.rsplit('.', 1)[1].lower()
         unique_filename = f"{uuid.uuid4().hex}.{file_ext}"
         filename = secure_filename(unique_filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        
-        # Save image
-        file.save(filepath)
-        
-        # Store relative path for web access
-        image_path = f"alerts/{filename}"
         
         # Insert into database
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO alerts (image_path, label, confidence, timestamp)
-            VALUES (?, ?, ?, ?)
-        ''', (image_path, label, confidence, timestamp))
+        
+        if USE_POSTGRES:
+            cursor.execute('''
+                INSERT INTO alerts (image_data, image_filename, label, confidence, timestamp)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            ''', (image_base64, filename, label, confidence, timestamp))
+            alert_id = cursor.fetchone()[0]
+        else:
+            cursor.execute('''
+                INSERT INTO alerts (image_data, image_filename, label, confidence, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (image_base64, filename, label, confidence, timestamp))
+            alert_id = cursor.lastrowid
+        
         conn.commit()
-        alert_id = cursor.lastrowid
         conn.close()
         
         return jsonify({
             'success': True,
             'id': alert_id,
             'message': 'Alert created successfully',
-            'image_path': image_path
+            'image_filename': filename
         }), 201
     
     except ValueError as e:
@@ -158,10 +233,51 @@ def create_alert():
     except Exception as e:
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
-@app.route('/static/<path:filename>')
-def serve_static(filename):
-    """Serve static files"""
-    return send_from_directory('static', filename)
+@app.route('/image/<int:alert_id>')
+def get_image(alert_id):
+    """Serve image for a specific alert"""
+    if USE_POSTGRES:
+        query = '''
+            SELECT image_data, image_filename FROM alerts 
+            WHERE id = %s
+        '''
+    else:
+        query = '''
+            SELECT image_data, image_filename FROM alerts 
+            WHERE id = ?
+        '''
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute(query, (alert_id,))
+    result = cursor.fetchone()
+    conn.close()
+    
+    if not result:
+        return jsonify({'error': 'Image not found'}), 404
+    
+    if USE_POSTGRES:
+        image_data, filename = result
+    else:
+        image_data, filename = result[0], result[1]
+    
+    # Decode base64 and return image
+    image_bytes = base64.b64decode(image_data)
+    
+    # Determine content type from filename
+    ext = filename.rsplit('.', 1)[1].lower()
+    content_types = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp'
+    }
+    content_type = content_types.get(ext, 'image/jpeg')
+    
+    from flask import Response
+    return Response(image_bytes, mimetype=content_type)
 
 if __name__ == '__main__':
     # Initialize database on startup
