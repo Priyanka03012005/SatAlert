@@ -12,17 +12,17 @@
    ```bash
    git init
    git add .
-   git commit -m "Initial commit - Wildfire Detection Alert System"
+   git commit -m "Initial commit - SatAlert"
    ```
 
 2. **Create GitHub Repository**:
    - Go to https://github.com/new
-   - Create a new repository (e.g., `wildfire-detection-alert`)
+   - Create a new repository (e.g., `satalert`)
    - **DO NOT** initialize with README, .gitignore, or license
 
 3. **Push to GitHub**:
    ```bash
-   git remote add origin https://github.com/YOUR_USERNAME/wildfire-detection-alert.git
+   git remote add origin https://github.com/YOUR_USERNAME/satalert.git
    git branch -M main
    git push -u origin main
    ```
@@ -37,10 +37,10 @@
    - Click "New +" button
    - Select "Web Service"
    - Connect your GitHub account (if not already connected)
-   - Select your repository: `wildfire-detection-alert`
+   - Select your repository: `satalert`
 
 3. **Configure Service**:
-   - **Name**: `wildfire-detection-alert` (or your choice)
+   - **Name**: `satalert` (or your choice)
    - **Environment**: `Python 3`
    - **Region**: Choose closest to you
    - **Branch**: `main` (or your default branch)

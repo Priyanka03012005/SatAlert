@@ -1,8 +1,8 @@
 """
-AI Integration Example for Wildfire Detection Alert System
+AI Integration Example for SatAlert
 
 This script demonstrates how to integrate an AI detection system
-with the Wildfire Detection Alert Web Application.
+with the SatAlert Web Application.
 
 Usage:
     python ai_integration_example.py
@@ -117,7 +117,7 @@ def simulate_detection(image_path, label="fire", confidence=0.92):
 def main():
     """Main function demonstrating the integration workflow."""
     print("=" * 60)
-    print("🔥 Wildfire Detection Alert System - AI Integration")
+    print("🛰️ SatAlert - AI Integration")
     print("=" * 60)
     print()
     

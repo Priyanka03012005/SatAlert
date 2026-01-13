@@ -1,4 +1,4 @@
-# 🔥 Wildfire Detection Alert Web Application
+# 🛰️ SatAlert
 
 A complete Flask-based web application for monitoring and alerting on wildfire detections. Designed for cloud deployment on Render.com with SQLite database and real-time alert display.
 

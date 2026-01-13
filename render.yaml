@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: wildfire-detection-alert
+    name: satalert
     env: python
     buildCommand: pip install -r requirements.txt
     startCommand: python app.py
